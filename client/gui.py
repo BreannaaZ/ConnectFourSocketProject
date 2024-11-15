@@ -17,11 +17,8 @@ PLAYER_COLORS = [(255, 0, 0), (255, 255, 0)]  # Red and Yellow
 BACKGROUND_COLOR = (0, 0, 0)  # Black
 BOARD_COLOR = (128, 128, 128)  # Gray
 EMPTY_SLOT_COLOR = (255, 255, 255)  # White
-PLAYER1_BORDER_COLOR = (255, 255, 255)  # White border
-PLAYER2_BORDER_COLOR = (255, 255, 255)  # White border
-BORDER_THICKNESS = 3  # Thickness of the border
+BORDER_THICKNESS = 4  # Thickness of the border
 PLAYER_COLOR = (128, 128, 128)
-TOP_ROW_COLOR = (128, 128, 128)
 
 # Initialize Pygame
 pygame.init()
@@ -34,7 +31,7 @@ subtitle_font = pygame.font.Font(None, 48)  # Font for subtitle, size 48
 small_font = pygame.font.Font(None, 24)  # Font for smaller text, size 24
 
 
-def draw_board(board):
+def draw_board(board, current_player, hovered_column):
     """Draw the Connect 4 board."""
     screen.fill(BACKGROUND_COLOR)
 
@@ -50,6 +47,15 @@ def draw_board(board):
     player1_turn_text = subtitle_font.render("PLAYER 1", True, (255, 0, 0))
     player1_rect = player1_turn_text.get_rect(center=((SCREEN_WIDTH // 2 - 250) + 100, (TOP_PADDING // 2 + 10) + 25))
     screen.blit(player1_turn_text, player1_rect)
+
+    # Get current player/turn to change colors
+    if current_player == 0:
+        PLAYER1_BORDER_COLOR = (255, 0, 0)
+    else: PLAYER1_BORDER_COLOR = BACKGROUND_COLOR
+    if current_player == 1:
+        PLAYER2_BORDER_COLOR = (0, 0, 255)
+    else:
+        PLAYER2_BORDER_COLOR = BACKGROUND_COLOR
 
     # Player1 textbox border
     player1_border_rect = player1_rect.inflate(50, 20)
@@ -78,7 +84,7 @@ def draw_board(board):
 
             # Adjust for the top row (different color)
             if r == 0:
-                color = TOP_ROW_COLOR  # Set color for the new top row
+                color = BACKGROUND_COLOR  # Set color for the new top row
             else:
                 color = EMPTY_SLOT_COLOR  # Set color for the regular slots
 
@@ -88,6 +94,19 @@ def draw_board(board):
             if r > 0 and board[r - 1][c] is not None:
                 color = PLAYER_COLORS[board[r][c]]
                 pygame.draw.circle(screen, color, (x + CELL_SIZE // 2, y + CELL_SIZE // 2), RADIUS)
+
+        # Highlight the topmost circle of the hovered column
+        if hovered_column is not None:
+            x = hovered_column * CELL_SIZE + PADDING
+            y = PADDING + CELL_SIZE  # Keep it at the top of the screen
+            # Get current player/turn to change colors
+            if current_player == 0:
+                HOVER_COLOR = (255, 0, 0)
+            elif current_player == 1:
+                HOVER_COLOR = (0, 0, 255)
+            else:
+                HOVER_COLOR = BACKGROUND_COLOR
+            pygame.draw.circle(screen, HOVER_COLOR, (x + CELL_SIZE // 2, y + CELL_SIZE // 2), RADIUS)
 
     # Quite game button
     # Define button properties
@@ -109,13 +128,15 @@ def draw_board(board):
     pygame.draw.rect(screen, (0, 0, 0), button_rect, 3)  # Optionally add a black border around the button
     # Draw the text inside the button
     screen.blit(reset_text, reset_text_rect)
-    # Handle mouse hover effect (change color when hovered)
+    # Handle mouse hover effect over button (change color when hovered)
     mouse_pos = pygame.mouse.get_pos()
     if button_rect.collidepoint(mouse_pos):
         pygame.draw.rect(screen, BUTTON_HOVER_COLOR, button_rect)  # Change button color on hover
         pygame.draw.rect(screen, (0, 0, 0), button_rect, 3)  # Border stays the same
         screen.blit(reset_text, reset_text_rect)  # Redraw the text on top of the button
 
+    # Return the button rectangle so it can be checked in the event loop
+    return button_rect
 
 def handle_click(x, board, current_player):
     """Handle the column selection and return the updated board."""
@@ -134,7 +155,7 @@ def handle_click(x, board, current_player):
 def display_winner(winner):
     """Display the winning message and quit."""
     message = f"Player {winner + 1} wins!"
-    text = font.render(message, True, (255, 255, 255))
+    text = subtitle_font.render(message, True, (255, 255, 255))
     text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, PADDING // 2))
     screen.blit(text, text_rect)
     pygame.display.update()
@@ -146,7 +167,10 @@ def display_winner(winner):
 def main():
     # Initialize the board
     board = [[None for _ in range(COLS)] for _ in range(ROWS)]
-    current_player = 0  # 0 = Red, 1 = Yellow
+    current_player = 0  # 0 = Red Player 1, 1 = Blue Player 2
+    hovered_column = None
+
+    button_rect = draw_board(board, current_player, hovered_column)
 
     # Main game loop
     running = True
@@ -155,6 +179,12 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Handle reset game button clicked
+                if event.button == 1:  # Left mouse button clicked
+                    if button_rect.collidepoint(event.pos):  # Check if click is inside the button
+                        # Reset the game (clear board, etc.)
+                        reset_game()  # Call your function to reset the game state
+
                 # Handle column click
                 x = event.pos[0]
                 board, move = handle_click(x, board, current_player)
@@ -171,8 +201,16 @@ def main():
                     # Switch players
                     current_player = 1 - current_player
 
-        # Draw the board
-        draw_board(board)
+        # Get the current mouse position
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        # Calculate which column the mouse is over
+        hovered_column = (mouse_x - PADDING) // CELL_SIZE
+        if hovered_column < 0 or hovered_column >= COLS\
+                or mouse_y < TOP_PADDING or mouse_y > (ROWS * CELL_SIZE + BOTTOM_PADDING):
+            hovered_column = None  # Mouse is not over any column
+
+        # Draw and update the board
+        draw_board(board, current_player, hovered_column)
         pygame.display.update()
 
     pygame.quit()
