@@ -22,6 +22,11 @@ BOARD_COLOR = (128, 128, 128)  # Gray
 EMPTY_SLOT_COLOR = (255, 255, 255)  # White
 BORDER_THICKNESS = 4  # Thickness of the border
 PLAYER_COLOR = (128, 128, 128)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+RED = (255, 0, 0)
 
 # Initialize Pygame
 pygame.init()
@@ -56,11 +61,11 @@ def draw_board(hovered_column):
 
     # Get current player/turn to change colors
     if game_instance.current_player == 'X':
-        PLAYER1_BORDER_COLOR = (255, 0, 0)
+        PLAYER1_BORDER_COLOR = RED
     else:
         PLAYER1_BORDER_COLOR = BACKGROUND_COLOR
     if game_instance.current_player == 'O':
-        PLAYER2_BORDER_COLOR = (0, 0, 255)
+        PLAYER2_BORDER_COLOR = BLUE
     else:
         PLAYER2_BORDER_COLOR = BACKGROUND_COLOR
 
@@ -68,7 +73,7 @@ def draw_board(hovered_column):
     player1_border_rect = player1_rect.inflate(50, 20)
     pygame.draw.rect(screen, PLAYER1_BORDER_COLOR, player1_border_rect, BORDER_THICKNESS)
 
-    player2_turn_text = subtitle_font.render("PLAYER 2", True, (0, 0, 255))
+    player2_turn_text = subtitle_font.render("PLAYER 2", True, BLUE)
     player2_rect = player2_turn_text.get_rect(center=((SCREEN_WIDTH // 2 + 50) + 100, (TOP_PADDING // 2 + 10) + 25))
     screen.blit(player2_turn_text, player2_rect)
 
@@ -112,9 +117,9 @@ def draw_board(hovered_column):
             y = PADDING + CELL_SIZE  # Keep it at the top of the screen
             # Get current player/turn to change colors
             if game_instance.current_player == 'X':
-                HOVER_COLOR = (255, 0, 0)
+                HOVER_COLOR = RED
             elif game_instance.current_player == 'O':
-                HOVER_COLOR = (0, 0, 255)
+                HOVER_COLOR = BLUE
             else:
                 HOVER_COLOR = BACKGROUND_COLOR
             pygame.draw.circle(screen, HOVER_COLOR, (x + CELL_SIZE // 2, y + CELL_SIZE // 2), RADIUS)
@@ -123,9 +128,9 @@ def draw_board(hovered_column):
     # Define button properties
     BUTTON_WIDTH = 225
     BUTTON_HEIGHT = 50
-    BUTTON_COLOR = (255, 0, 0)  # Red
+    BUTTON_COLOR = RED
     BUTTON_HOVER_COLOR = (200, 0, 0)  # Darker red for hover effect
-    BUTTON_TEXT_COLOR = (255, 255, 255)  # White text color
+    BUTTON_TEXT_COLOR = WHITE
 
     # Create the button rectangle (position it below the board)
     button_rect = pygame.Rect((SCREEN_WIDTH // 2 - BUTTON_WIDTH // 2, SCREEN_HEIGHT - BUTTON_HEIGHT - 20),
@@ -158,21 +163,60 @@ def handle_click(x, y):
     return valid_move
 
 
+# When a player wins, displays the winning status and a button for retry or quit
 def display_winner(winner):
-    """Display the winning message and quit."""
-    message = f"Player {winner + 1} wins!"
-    text = subtitle_font.render(message, True, (255, 255, 255))
-    text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, PADDING // 2))
+    # Draw a semi-transparent overlay
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    overlay.set_alpha(200)  # Make the overlay semi-transparent
+    overlay.fill(BLACK)
+    screen.blit(overlay, (0, 0))
+
+    message = f"PLAYER {winner} WINS!"
+    text = title_font.render(message, True, WHITE)
+    text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
     screen.blit(text, text_rect)
+
+    # Retry and quit button dimensions
+    BUTTON_WIDTH = 200
+    BUTTON_HEIGHT = 50
+    # Create the retry button
+    retry_button = pygame.Rect((SCREEN_WIDTH // 4) - (BUTTON_WIDTH // 2), SCREEN_HEIGHT // 2, BUTTON_WIDTH,
+                               BUTTON_HEIGHT)
+    pygame.draw.rect(screen, GREEN, retry_button)
+    retry_text = subtitle_font.render("Retry", True, WHITE)
+    retry_text_rect = retry_text.get_rect(center=retry_button.center)
+    screen.blit(retry_text, retry_text_rect)
+
+    # Create the quit button
+    quit_button = pygame.Rect((3 * SCREEN_WIDTH // 4) - (BUTTON_WIDTH // 2), SCREEN_HEIGHT // 2, BUTTON_WIDTH,
+                              BUTTON_HEIGHT)
+    pygame.draw.rect(screen, RED, quit_button)
+    quit_text = subtitle_font.render("Quit", True, WHITE)
+    quit_text_rect = quit_text.get_rect(center=quit_button.center)
+    screen.blit(quit_text, quit_text_rect)
+
     pygame.display.update()
-    pygame.time.wait(3000)
-    pygame.quit()
-    sys.exit()
+
+    # Wait for a button click
+    waiting_for_click = True
+    while waiting_for_click:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left mouse button clicked
+                    if retry_button.collidepoint(event.pos):
+                        game_instance.reset_game()  # Call the function to reset the game
+                        waiting_for_click = False  # Exit the loop and continue the game
+                    elif quit_button.collidepoint(event.pos):
+                        pygame.quit()
+                        sys.exit()  # Quit the game
 
 
 def main():
     hovered_column = None
-    button_rect = draw_board(hovered_column) # Draw board and get reset button location
+    button_rect = draw_board(hovered_column)  # Draw board and get reset button location
 
     # Main game loop
     running = True
@@ -197,13 +241,10 @@ def main():
                     pygame.display.update()
 
                     # Check for a winner
-                    if game_instance.check_win():
+                    if game_instance.status == 'PLAYER1_WON' or game_instance.status == 'PLAYER2_WON':
                         draw_board(hovered_column)
                         pygame.display.update()
-                        display_winner(game_instance.current_player)
-
-                    # Switch players
-                    game_instance.switch_player()
+                        display_winner(game_instance.status[6])
 
         # Get the current mouse position
         mouse_x, mouse_y = pygame.mouse.get_pos()
